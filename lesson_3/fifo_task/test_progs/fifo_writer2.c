@@ -37,6 +37,8 @@ int main(){
 
 	(void) umask(0);
 
+	sleep(2);
+
 	if (mkfifo("namedpipe4", 0666) == -1)
     {
         perror("namedpipe4 already exists in writer 2");

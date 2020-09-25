@@ -38,18 +38,32 @@ int main(){
 	(void) umask(0);
 
 	printf("FIFO reader pid = %d\n", getpid());
-
+	/*
 	int fifo = open("namedpipe4", O_RDONLY);
 
 	if(fifo < 1){
 		printf("FIFO descriptor in reader: %d", fifo);
 		perror("Can't open file in reader:");
+		return -1;
 	}
+	*/
+
+	int fifo = -1; 
+
+	while ( (fifo = open("namedpipe4", O_RDONLY)) < 1){
+
+	}
+
+	remove("namedpipe4");
+
+	printf("FIFO %d was removed in reader\n", fifo);
 
 	printf("FIFO %d was opened in reader\n", fifo);
 
 	char buf[100] = {};
 
+	sleep(10);
+	
 	int res = read(fifo, buf, 100);
 	if(res < 0){
 		perror("Reading error in reader:");
@@ -58,7 +72,7 @@ int main(){
 
 	printf("Fisrt write result: %s\n", buf);
 
-	sleep(20);
+	sleep(10);
 
 	res = read(fifo, buf, 100);
 	if(res < 0){
@@ -68,10 +82,6 @@ int main(){
 
 	printf("Second write result: %s\n", buf);
 
-	remove("namedpipe4");
-
-	printf("FIFO %d was removed in reader\n", fifo);
-	
 	return 0;
 }
 

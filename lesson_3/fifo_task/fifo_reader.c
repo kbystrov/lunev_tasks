@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/file.h>
 
 const char * fifo_name = "fifo_name";
 
@@ -41,15 +42,32 @@ int main(){
 	fprintf(stderr, "FIFO reader pid = %d\n", getpid());
 	#endif //! DEBUG_PRINT_INFO
 
-	int fifo_id = open(fifo_name, O_RDONLY);
+	int fifo_id = -1;
+	
+	while(1){
+		while ( ( fifo_id = open(fifo_name, O_RDONLY) ) < 1){ 
+			//! Waiting FIFO creation by writer
+		}
 
-	if(fifo_id < 1){
-		printf("FIFO descriptor in reader: %d", fifo_id);
-		perror("Can't open file in reader:");
+		if (flock (fifo_id, LOCK_EX | LOCK_NB) == 0){
+    	    break;
+		}
+
+    	close(fifo_id);
 	}
 
 	#ifdef DEBUG_PRINT_INFO
 	fprintf(stderr, "FIFO %d was opened in reader: %s\n", fifo_id, fifo_name);
+	#endif //! DEBUG_PRINT_INFO
+
+	if ( remove(fifo_name) == -1 ){
+		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);
+		perror("Can't remove FIFO in writer");
+        return -2;
+	}
+
+	#ifdef DEBUG_PRINT_INFO
+	fprintf(stderr, "FIFO %d was removed in reader\n", fifo_id);
 	#endif //! DEBUG_PRINT_INFO
 
 	long res = 0;
@@ -71,12 +89,6 @@ int main(){
 		perror("Errno message:");
 		return -13;
 	}
-
-	remove(fifo_name);
-
-	#ifdef DEBUG_PRINT_INFO
-	fprintf(stderr, "FIFO %d was removed in reader\n", fifo_id);
-	#endif //! DEBUG_PRINT_INFO
 	
 	return 0;
 }
