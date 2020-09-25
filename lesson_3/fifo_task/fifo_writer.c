@@ -36,6 +36,31 @@ const int num_argc = 2;
 
 const char * fifo_name = "fifo_name";
 
+FILE * make_file(const char * argv){
+
+	if(argv == NULL){
+		fprintf(stderr, "Input argv is NULL in make_file()\n");
+		return NULL;
+	}
+
+	char * input_file_name = strdup(argv);
+	if(input_file_name == NULL){
+		fprintf(stderr, "Error during strdup() for input file name\n");
+		return NULL;
+	} 
+
+	FILE * input_file = fopen(input_file_name, "r");
+	if (input_file == NULL){
+		fprintf(stderr, "Error while opening input file %s\n", input_file_name);
+		free(input_file_name);
+		return NULL;
+	}
+
+	free(input_file_name);
+
+	return input_file;
+}
+
 
 int read_file_to_buf(FILE * input_file, char ** buf){
 
@@ -149,25 +174,13 @@ int main(int argc, char **argv){
 		return -1;
 	}
 
-	char * input_file_name = strdup(argv[1]);
-	if(input_file_name == NULL){
-		fprintf(stderr, "Error during strdup() for input file name\n");
-		return -2;
-	} 
-
-	FILE * input_file = fopen(input_file_name, "r");
-	if (input_file == NULL){
-		fprintf(stderr, "Error while opening input file %s\n", input_file_name);
-		free(input_file_name);
-		return -3;
-	}
+	FILE * input_file = make_file(argv[1]);
 
 	char * file_data = NULL;
 
 	long res = read_file_to_buf(input_file, &file_data);
 	if (res < 0){
 		fprintf(stderr, "Was error %ld in writer\n", res);
-
 		return res;
 	}
 
