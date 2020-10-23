@@ -306,7 +306,7 @@ int main(int argc, char **argv){
 	if ( remove(fifo_name) == -1 ){
 		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);
 		perror("Can't remove FIFO in writer");
-        //return -2;
+        return -16;
 	}
 
 	#ifdef DEBUG_PRINT_INFO
@@ -316,7 +316,7 @@ int main(int argc, char **argv){
 	if ( close(fifo_id) == -1){
 		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);
 		perror("Can't close FIFO in writer");
-        return -3;
+        return -17;
 	}
 	
 	return 0;

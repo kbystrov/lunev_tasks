@@ -44,10 +44,7 @@ int make_uniq_fifo_name(char * fifo_name, int wr_pid){
 		return -3;
 	}
 
-	(void) umask(0);
-
 	snprintf(fifo_name , MAX_NAME_SIZE, "fifo_%d", wr_pid);
-	fprintf(stderr, "Reader creates unique FIFO name = %s\n", fifo_name);
 
 	#ifdef DEBUG_PRINT_INFO
 	fprintf(stderr, "FIFO %s is made by reader pid = %d\n", fifo_name, getpid());
@@ -80,13 +77,8 @@ int main(){
 		return res;
 	}
 	
-
 	(void) umask(0);
-
-	#ifdef DEBUG_PRINT_INFO
-	fprintf(stderr, "FIFO reader pid = %d\n", getpid());
-	#endif //! DEBUG_PRINT_INFO
-
+	//! Открываем уникальную FIFO для пары writer-reader
 	int fifo_id = open(fifo_name, O_RDONLY);
 	if(fifo_id < 0){
 		perror("ERROR while opening unique FIFO in reader");
@@ -97,16 +89,18 @@ int main(){
 	fprintf(stderr, "FIFO %d was opened in reader: %s\n", fifo_id, fifo_name);
 	#endif //! DEBUG_PRINT_INFO
 
+	//! Сразу вызываем remove для FIFO, что бы удалилось после смерти процессов
 	if ( remove(fifo_name) == -1 ){
 		fprintf(stderr, "FIFO %s with id = %d in reader\n", fifo_name, fifo_id);
 		perror("Can't remove FIFO in writer");
-        return -2;
+        return -5;
 	}
 
 	#ifdef DEBUG_PRINT_INFO
 	fprintf(stderr, "FIFO %d was removed in reader\n", fifo_id);
 	#endif //! DEBUG_PRINT_INFO
 
+	//! Считываем FIFO 
 	long rd_res = 0;
 	long read_len = 0;
 	char buf[BUF_SIZE] = {};
@@ -124,7 +118,7 @@ int main(){
 	if (res < 0){
 		fprintf(stderr, "Error result %d while reading in parent process\n", res);
 		perror("Errno message:");
-		return -13;
+		return -6;
 	}
 	
 	return 0;
