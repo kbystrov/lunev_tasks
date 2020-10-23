@@ -51,6 +51,7 @@ int make_global_fifo(){
     } else {
 		printf("Global FIFO was created by PID = %d\n", getpid());
 	}
+	errno = 0;
 	//! Открываем ее для передачи и получаем ее FD, что бы потом передать туда свой PID reader-у 
 	int global_fifo_id = open(global_fifo_name, O_WRONLY);
 	if(global_fifo_id < 1){
@@ -155,10 +156,10 @@ int read_file_to_buf(FILE * input_file, char ** buf){
 	return read_num;
 }
 
-int make_uniq_fifo_name(char * fifo_name){
+int make_uniq_fifo(char * fifo_name){
 
 	if(fifo_name == NULL){
-		fprintf(stderr, "NULL input buffer in make_uniq_fifo_name()\n");
+		fprintf(stderr, "NULL input buffer in make_uniq_fifo()\n");
 		return -11;
 	}
 
@@ -167,10 +168,18 @@ int make_uniq_fifo_name(char * fifo_name){
 	snprintf(fifo_name , BUF_MAX_SIZE, "fifo_%d", getpid());
 	printf("Writer creates unique FIFO name = %s\n", fifo_name);
 
+	repeat:
+	errno = 0;
 	if (mkfifo(fifo_name, (FIFO_MODE) ) == -1){
-        perror("Unique FIFO already exists");
-        return -12;
+		if(errno == EEXIST){
+			remove(fifo_name);
+			goto repeat;
+		} else {
+        	perror("Unique FIFO already exists");
+        	return -12;
+		}
     }
+	errno = 0;
 
 	#ifdef DEBUG_PRINT_INFO
 	printf("FIFO %s is made by writer pid = %d\n", fifo_name, getpid());
@@ -256,7 +265,7 @@ int main(int argc, char **argv){
 
 	//! Создаем FIFO с уникальным именем в зависимости от PID writer-а для пары wrirer-reader
 	char fifo_name[BUF_MAX_SIZE] = {};
-	res = make_uniq_fifo_name(fifo_name);
+	res = make_uniq_fifo(fifo_name);
 	if(res < 0){
 		fprintf(stderr, "Was error %ld in writer\n", res);
 		fclose(input_file);
@@ -297,7 +306,7 @@ int main(int argc, char **argv){
 	if ( remove(fifo_name) == -1 ){
 		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);
 		perror("Can't remove FIFO in writer");
-        return -2;
+        //return -2;
 	}
 
 	#ifdef DEBUG_PRINT_INFO
