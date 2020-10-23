@@ -30,11 +30,56 @@
 #include <fcntl.h>
 #include <sys/file.h>
 
-const char * fifo_name = "fifo_name";
+const char * global_fifo_name = "global_fifo";
 
 #define BUF_SIZE 4096
 
+#define FIFO_MODE 0666
+#define MAX_NAME_SIZE 100
+
+int make_uniq_fifo_name(char * fifo_name, int wr_pid){
+
+	if(fifo_name == NULL){
+		fprintf(stderr, "NULL input buffer in make_uniq_fifo()\n");
+		return -3;
+	}
+
+	(void) umask(0);
+
+	snprintf(fifo_name , MAX_NAME_SIZE, "fifo_%d", wr_pid);
+	fprintf(stderr, "Reader creates unique FIFO name = %s\n", fifo_name);
+
+	#ifdef DEBUG_PRINT_INFO
+	fprintf(stderr, "FIFO %s is made by reader pid = %d\n", fifo_name, getpid());
+	#endif //! DEBUG_PRINT_INFO
+
+	return 0;
+};
+
 int main(){
+
+	(void) umask(0);
+	//! Открываем глобальную FIFO для получения PID writer-а
+	int global_fifo_id = open(global_fifo_name, O_RDONLY);
+	if(global_fifo_id < 1){
+		fprintf(stderr, "Can't open global FIFO in reader");
+		return -1;
+	}
+	//! Считываем PID очередного writer-а
+	int wr_pid = 0;
+	int res = read(global_fifo_id, &wr_pid, sizeof(int));
+	if(res < 0){
+		perror("Error while opening global FIFO in reader");
+		return -2;
+	}
+	//! Получаем имя уникального FIFO по PID-у writer-а
+	char fifo_name[100] = {};
+	res = make_uniq_fifo_name(fifo_name, wr_pid);
+	if(res < 0){
+		fprintf(stderr, "Error while making unique FIFO name in reader");
+		return res;
+	}
+	
 
 	(void) umask(0);
 
@@ -42,18 +87,10 @@ int main(){
 	fprintf(stderr, "FIFO reader pid = %d\n", getpid());
 	#endif //! DEBUG_PRINT_INFO
 
-	int fifo_id = -1;
-	
-	while(1){
-		while ( ( fifo_id = open(fifo_name, O_RDONLY) ) < 1){ 
-			//! Waiting FIFO creation by writer
-		}
-
-		if (flock (fifo_id, LOCK_EX | LOCK_NB) == 0){
-    	    break;
-		}
-
-    	close(fifo_id);
+	int fifo_id = open(fifo_name, O_RDONLY);
+	if(fifo_id < 0){
+		perror("ERROR while opening unique FIFO in reader");
+		return -4;
 	}
 
 	#ifdef DEBUG_PRINT_INFO
@@ -61,7 +98,7 @@ int main(){
 	#endif //! DEBUG_PRINT_INFO
 
 	if ( remove(fifo_name) == -1 ){
-		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);
+		fprintf(stderr, "FIFO %s with id = %d in reader\n", fifo_name, fifo_id);
 		perror("Can't remove FIFO in writer");
         return -2;
 	}
@@ -70,13 +107,13 @@ int main(){
 	fprintf(stderr, "FIFO %d was removed in reader\n", fifo_id);
 	#endif //! DEBUG_PRINT_INFO
 
-	long res = 0;
+	long rd_res = 0;
 	long read_len = 0;
 	char buf[BUF_SIZE] = {};
 
-	while ( (res = read(fifo_id, buf, BUF_SIZE)) > 0 ) {
-		fwrite(buf, 1, res, stdout);
-		read_len += res;
+	while ( (rd_res = read(fifo_id, buf, BUF_SIZE)) > 0 ) {
+		fwrite(buf, 1, rd_res, stdout);
+		read_len += rd_res;
 	}
 
 	#ifdef DEBUG_PRINT_INFO
@@ -85,7 +122,7 @@ int main(){
 
 	close(fifo_id);
 	if (res < 0){
-		fprintf(stderr, "Error result %ld while reading in parent process\n", res);
+		fprintf(stderr, "Error result %d while reading in parent process\n", res);
 		perror("Errno message:");
 		return -13;
 	}
