@@ -37,6 +37,24 @@ const char * global_fifo_name = "global_fifo";
 #define FIFO_MODE 0666
 #define MAX_NAME_SIZE 100
 
+int get_wr_pid(){
+	(void) umask(0);
+	//! Открываем глобальную FIFO для получения PID writer-а
+	int global_fifo_id = open(global_fifo_name, O_RDONLY);
+	if(global_fifo_id < 1){
+		fprintf(stderr, "Can't open global FIFO in reader");
+		return -1;
+	}
+	//! Считываем PID очередного writer-а
+	int wr_pid = 0;
+	int res = read(global_fifo_id, &wr_pid, sizeof(int));
+	if(res < 0){
+		perror("Error while opening global FIFO in reader");
+		return -2;
+	}
+	return wr_pid;
+}
+
 int make_uniq_fifo_name(char * fifo_name, int wr_pid){
 
 	if(fifo_name == NULL){
@@ -55,23 +73,15 @@ int make_uniq_fifo_name(char * fifo_name, int wr_pid){
 
 int main(){
 
-	(void) umask(0);
-	//! Открываем глобальную FIFO для получения PID writer-а
-	int global_fifo_id = open(global_fifo_name, O_RDONLY);
-	if(global_fifo_id < 1){
-		fprintf(stderr, "Can't open global FIFO in reader");
-		return -1;
-	}
-	//! Считываем PID очередного writer-а
-	int wr_pid = 0;
-	int res = read(global_fifo_id, &wr_pid, sizeof(int));
-	if(res < 0){
-		perror("Error while opening global FIFO in reader");
-		return -2;
+	//! Открываем глобальную FIFO для получения PID writer-а и считываем его
+	int wr_pid = get_wr_pid();
+	if(wr_pid < 0){
+		fprintf(stderr, "Error while opening global FIFO in reader\n");
+		return wr_pid;
 	}
 	//! Получаем имя уникального FIFO по PID-у writer-а
 	char fifo_name[100] = {};
-	res = make_uniq_fifo_name(fifo_name, wr_pid);
+	int res = make_uniq_fifo_name(fifo_name, wr_pid);
 	if(res < 0){
 		fprintf(stderr, "Error while making unique FIFO name in reader");
 		return res;
