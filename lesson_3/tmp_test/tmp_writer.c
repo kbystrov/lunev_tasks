@@ -54,9 +54,7 @@ int main(){
 		return -3;
 	}
 	
-	while(1){
-
-	}
+	sleep(20);
 
 	if ( fclose(tmp_file) ){
 		perror("Error while closing TMP file");

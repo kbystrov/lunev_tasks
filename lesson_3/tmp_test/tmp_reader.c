@@ -45,7 +45,10 @@ int main(int argc, char ** argv){
 	int fd = open(argv[1], O_RDONLY);
 	if(fd == -1){
 		perror("Error during file opening");
+		return -2;
 	}
+
+	sleep(20);
 
 	char buf[30] = {};
 
