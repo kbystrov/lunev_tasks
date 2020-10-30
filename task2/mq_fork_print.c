@@ -28,6 +28,13 @@
 #include <limits.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+const int num_argc = 2;
+#define MSQ_MODE 0666
+
 
 long get_input_num(const char * argv){
 	long n = 0;
@@ -54,7 +61,7 @@ long get_input_num(const char * argv){
 	return n;
 }
 
-//! В случае успеха для ребенка возвращает порядковый номер создания (<= 1), для родителя 0, при ошибке -1.
+//! On succes return craetion order id for child (<= 1), 0 - for parent, and -1 in case of error.
 long fork_n_childs(long chld_num){
 
 	if(chld_num < 1){
@@ -86,28 +93,48 @@ long fork_n_childs(long chld_num){
 	return 0;
 }
 
-const int num_argc = 2;
+int delete_msgq(key_t msqid){
+	int res = msgctl(msqid, IPC_RMID, NULL);
+	if(res == -1){
+		perror("ERROR during deleting message queue");
+	}
+	return res;
+}
 
 int main(int argc, char **argv){
+
+	int res = 0;
 	
 	if(argc != num_argc){
 		fprintf(stderr, "Wrong number of argc = %d! Should be %d!\n", argc, num_argc);
 		return -1;
 	}
-
+	//! Reads input argument
 	long chld_num = get_input_num(argv[1]);
 	if(chld_num < 1){
 		fprintf(stderr, "ERROR %ld while get input argument\n", chld_num);
 		return chld_num;
 	}
 	errno = 0;
-
+	//! Parent creates unique message queue before forking children
+	key_t msqid = msgget(IPC_PRIVATE, MSQ_MODE);
+	if(msqid == -1){
+		perror("ERROR while creating message queue");
+		return -1;
+	}
+	//! Trying forking n childs. If it fails - parent kills message queue
 	long order_id = fork_n_childs(chld_num);
 	if (order_id == -1){
 		fprintf(stderr, "ERROR while forking children\n");
-		return order_id;
+		res = delete_msgq(msqid);
+		return res;
+	}
+
+	//! Parent kills message queue at the end
+	if(order_id == 0){
+		res = delete_msgq(msqid);
 	}
 	
-	return 0;
+	return res;
 }
 
