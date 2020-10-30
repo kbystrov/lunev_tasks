@@ -54,6 +54,38 @@ long get_input_num(const char * argv){
 	return n;
 }
 
+//! В случае успеха для ребенка возвращает порядковый номер создания (<= 1), для родителя 0, при ошибке -1.
+long fork_n_childs(long chld_num){
+
+	if(chld_num < 1){
+		fprintf(stderr, "Error! Negative input number at %s\n", __PRETTY_FUNCTION__);
+		return -1;
+	}
+
+	for(long order_id = 1; order_id <= chld_num; order_id++){
+
+		pid_t pid = fork();
+
+		if(pid < 0){
+			perror("ERROR while fork child");
+			fprintf(stderr, "Error! Failure on creating child in %ld process\n", order_id);
+			return -1;
+		} else if (pid == 0) { //< Child
+			#ifdef DEBUG_PRINTS
+			printf("CHILD: have created child num = %ld with PID = %d\n", order_id, getpid() );
+			#endif //! DEBUG_PRINTS
+			return order_id;
+		} else {				//< Parent
+			#ifdef DEBUG_PRINTS
+			printf("PARENT: have created child num = %ld with PID = %d\n", order_id, pid);
+			#endif //! DEBUG_PRINTS
+		}
+
+	}
+
+	return 0;
+}
+
 const int num_argc = 2;
 
 int main(int argc, char **argv){
@@ -65,29 +97,16 @@ int main(int argc, char **argv){
 
 	long chld_num = get_input_num(argv[1]);
 	if(chld_num < 1){
-		fprintf(stderr, "ERROR %d while get input argument\n", chld_num);
+		fprintf(stderr, "ERROR %ld while get input argument\n", chld_num);
 		return chld_num;
 	}
 	errno = 0;
 
-	long order_id = 1;
-	int in_child = 0;
-
-	for(order_id = 1; order_id <= chld_num; order_id++){
-
-		pid_t pid = fork();
-
-		if(pid < 0){
-			perror("ERROR while fork child");
-			printf("Error! Failure on creating child in %ld process\n", order_id);
-			return -5;
-		} else if (pid == 0) {
-			in_child = 1;
-			break;
-		}
-
+	long order_id = fork_n_childs(chld_num);
+	if (order_id == -1){
+		fprintf(stderr, "ERROR while forking children\n");
+		return order_id;
 	}
-	
 	
 	return 0;
 }
