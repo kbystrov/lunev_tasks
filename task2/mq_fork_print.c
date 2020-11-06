@@ -35,10 +35,10 @@
 const int num_argc = 2;
 #define MSQ_MODE 0666
 
-struct msgbuf {
+typedef struct msgbuf {
     long mtype;
     long order_id; //< Is send from child to parent to notify last that child has made printf
-};
+} mybuf;
 
 
 
@@ -109,8 +109,10 @@ int delete_msgq(key_t msqid){
 	if(res == -1){
 		perror("ERROR during deleting message queue");
 	}
+	#ifdef DEBUG_PRINTS
 	printf("Msgq was deleted by %d!\n", getpid());
 	fflush(stdout);
+	#endif //! DEBUG_PRINTS
 	return res;
 }
 
@@ -143,7 +145,7 @@ int main(int argc, char **argv){
 		return res;
 	}
 
-	struct msgbuf msg;
+	mybuf msg;
 	long msg_to_par_type = chld_num + 1;
 	size_t maxlen = sizeof(msg.order_id);
 
@@ -153,41 +155,64 @@ int main(int argc, char **argv){
 
 			msg.mtype = i;
 
+			#ifdef DEBUG_PRINTS
 			printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
+			fflush(stdout);
+			#endif //! DEBUG_PRINTS
 
-			res = msgsnd(msqid, (void *) &msg, 0, IPC_NOWAIT); //< Parent notifies i-th child to make printf
+			res = msgsnd(msqid, (void *) &msg, 0, 0); //< Parent notifies i-th child to make printf
 			if(res == -1){
 				perror("ERROR while parent sends messages to childs");
 				break;
 			}
-
-			res = msgrcv(msqid, (void *) &msg, maxlen, i, 0); //< Parent waits notification form child that it has made printf
+			
+			maxlen = msgrcv(msqid, (void *) &msg, maxlen, msg_to_par_type, 0); //< Parent waits notification form child that it has made printf
 			if(msg.order_id != i){
 				fprintf(stderr, "ERROR: Wrong message from child! Should be %ld, but it is %ld\n", i, msg.order_id);
 				break;
 			}
 
+			#ifdef DEBUG_PRINTS
+			printf("After PARENT get from child: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
+			fflush(stdout);
+			#endif //! DEBUG_PRINTS
+
 		}
 
 	} else {			//! Child processing
 
+		#ifdef DEBUG_PRINTS
 		printf("order_id = %ld, msqid = %d\n", order_id, msqid);
+		fflush(stdout);
+		#endif //! DEBUG_PRINTS
+
 		res = msgrcv(msqid, (void *) &msg, 0, order_id, 0); //< Child waits notification form parent to start printfing
 		if(res == -1){
 			perror("ERROR in child while getting message from parent");
+			fflush(stderr);
 			return -1;
 		}
 
 		printf("[%ld] child PID = %d\n", order_id, getpid());
 
+		#ifdef DEBUG_PRINTS
+		printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
+		fflush(stdout);
+		#endif //! DEBUG_PRINTS
+		
 		msg.mtype = msg_to_par_type;
 		msg.order_id = order_id;
 
-		res = msgsnd(msqid, (void *) &msg, 0, 0); //< i-th child notifies parent that it has made printf
+		res = msgsnd(msqid, (void *) &msg, maxlen, 0); //< i-th child notifies parent that it has made printf
 		if(res == -1){
 			perror("ERROR while child sends messages to parent");
 			return -1;
 		}
+
+		#ifdef DEBUG_PRINTS
+		printf("After CHILD send to PARENT: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
+		fflush(stdout);
+		#endif //! DEBUG_PRINTS
 
 	}
 
