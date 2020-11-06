@@ -1,7 +1,7 @@
 /*
- * print_num.c
+ * mq_fork_print.c
  * 
- * Copyright 2020 Student <student@client112>
+ * Copyright 2020 Kirill Bystrov <kirill.bystrov@gmail.com>
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ const int num_argc = 2;
 
 typedef struct msgbuf {
     long mtype;
-    long order_id; //< Is send from child to parent to notify last that child has made printf
+    long order_id; //< Is send from child to parent to notify the last that child has made printf
 } mybuf;
 
 
@@ -72,7 +72,7 @@ long get_input_num(const char * argv){
 	return n;
 }
 
-//! On succes return craetion order id for child (<= 1), 0 - for parent, and -1 in case of error.
+//! On succes return creation order id for child (>= 1), 0 - for parent, and -1 in case of error.
 long fork_n_childs(long chld_num){
 
 	if(chld_num < 1){
@@ -116,6 +116,91 @@ int delete_msgq(key_t msqid){
 	return res;
 }
 
+/** Send to appropriate child message to make printf, waits for it answer and repeats it again for all other children. 
+  * At the end - deletes message queue. 
+*/
+int parent_processing(key_t msqid, long chld_num){
+
+	mybuf msg;
+	long msg_to_par_type = chld_num + 1;
+	size_t maxlen = sizeof(msg.order_id);
+
+	int res = 0;
+
+	for(long i = 1; i <= chld_num; i++){
+
+			msg.mtype = i;
+
+			#ifdef DEBUG_PRINTS
+			printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
+			fflush(stdout);
+			#endif //! DEBUG_PRINTS
+
+			res = msgsnd(msqid, (void *) &msg, 0, 0); //< Parent notifies i-th child to make printf
+			if(res == -1){
+				perror("ERROR while parent sends messages to childs");
+				break;
+			}
+			
+			maxlen = msgrcv(msqid, (void *) &msg, maxlen, msg_to_par_type, 0); //< Parent waits notification form child that it has made printf
+			if(msg.order_id != i){
+				fprintf(stderr, "ERROR: Wrong message from child! Should be %ld, but it is %ld\n", i, msg.order_id);
+				break;
+			}
+
+			#ifdef DEBUG_PRINTS
+			printf("After PARENT get from child: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
+			fflush(stdout);
+			#endif //! DEBUG_PRINTS
+
+	}
+	//! Parent kills message queue at the end
+	res = delete_msgq(msqid);
+	return res;
+}
+//! Waits notification form parent to start printfing, prints its order id and PID and notifies parent that it has made its printf.
+int child_processing(key_t msqid, long total_chld_num, long order_id){
+
+	mybuf msg;
+	long msg_to_par_type = total_chld_num + 1;
+	size_t maxlen = sizeof(msg.order_id);
+
+	#ifdef DEBUG_PRINTS
+	printf("order_id = %ld, msqid = %d\n", order_id, msqid);
+	fflush(stdout);
+	#endif //! DEBUG_PRINTS
+
+	int res = msgrcv(msqid, (void *) &msg, 0, order_id, 0); //< Child waits notification form parent to start printfing
+	if(res == -1){
+		perror("ERROR in child while getting message from parent");
+		fflush(stderr);
+		return -1;
+	}
+
+	printf("[%ld] child PID = %d\n", order_id, getpid());
+
+	#ifdef DEBUG_PRINTS
+	printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
+	fflush(stdout);
+	#endif //! DEBUG_PRINTS
+	
+	msg.mtype = msg_to_par_type;
+	msg.order_id = order_id;
+	res = msgsnd(msqid, (void *) &msg, maxlen, 0); //< i-th child notifies parent that it has made printf
+
+	if(res == -1){
+		perror("ERROR while child sends messages to parent");
+		return -1;
+	}
+
+	#ifdef DEBUG_PRINTS
+	printf("After CHILD send to PARENT: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
+	fflush(stdout);
+	#endif //! DEBUG_PRINTS
+
+	return res;
+}
+
 int main(int argc, char **argv){
 
 	int res = 0;
@@ -145,82 +230,12 @@ int main(int argc, char **argv){
 		return res;
 	}
 
-	mybuf msg;
-	long msg_to_par_type = chld_num + 1;
-	size_t maxlen = sizeof(msg.order_id);
-
 	if(order_id == 0){ 	//! Parent processing
-
-		for(long i = 1; i <= chld_num; i++){
-
-			msg.mtype = i;
-
-			#ifdef DEBUG_PRINTS
-			printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
-			fflush(stdout);
-			#endif //! DEBUG_PRINTS
-
-			res = msgsnd(msqid, (void *) &msg, 0, 0); //< Parent notifies i-th child to make printf
-			if(res == -1){
-				perror("ERROR while parent sends messages to childs");
-				break;
-			}
-			
-			maxlen = msgrcv(msqid, (void *) &msg, maxlen, msg_to_par_type, 0); //< Parent waits notification form child that it has made printf
-			if(msg.order_id != i){
-				fprintf(stderr, "ERROR: Wrong message from child! Should be %ld, but it is %ld\n", i, msg.order_id);
-				break;
-			}
-
-			#ifdef DEBUG_PRINTS
-			printf("After PARENT get from child: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
-			fflush(stdout);
-			#endif //! DEBUG_PRINTS
-
-		}
-
+		res = parent_processing(msqid, chld_num);
 	} else {			//! Child processing
-
-		#ifdef DEBUG_PRINTS
-		printf("order_id = %ld, msqid = %d\n", order_id, msqid);
-		fflush(stdout);
-		#endif //! DEBUG_PRINTS
-
-		res = msgrcv(msqid, (void *) &msg, 0, order_id, 0); //< Child waits notification form parent to start printfing
-		if(res == -1){
-			perror("ERROR in child while getting message from parent");
-			fflush(stderr);
-			return -1;
-		}
-
-		printf("[%ld] child PID = %d\n", order_id, getpid());
-
-		#ifdef DEBUG_PRINTS
-		printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
-		fflush(stdout);
-		#endif //! DEBUG_PRINTS
-		
-		msg.mtype = msg_to_par_type;
-		msg.order_id = order_id;
-
-		res = msgsnd(msqid, (void *) &msg, maxlen, 0); //< i-th child notifies parent that it has made printf
-		if(res == -1){
-			perror("ERROR while child sends messages to parent");
-			return -1;
-		}
-
-		#ifdef DEBUG_PRINTS
-		printf("After CHILD send to PARENT: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
-		fflush(stdout);
-		#endif //! DEBUG_PRINTS
-
+		res = child_processing(msqid, chld_num, order_id);
 	}
 
-	//! Parent kills message queue at the end
-	if(order_id == 0){
-		res = delete_msgq(msqid);
-	}
-	
 	return res;
 }
 
