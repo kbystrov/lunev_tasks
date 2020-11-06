@@ -116,9 +116,9 @@ int delete_msgq(key_t msqid){
 	return res;
 }
 
-/** Send to appropriate child message to make printf, waits for it answer and repeats it again for all other children. 
+/** Send to appropriate child message to make printf, waits for its answer and repeats it again for all other children. 
   * At the end - deletes message queue. 
-*/
+  */
 int parent_processing(key_t msqid, long chld_num){
 
 	mybuf msg;
@@ -129,29 +129,29 @@ int parent_processing(key_t msqid, long chld_num){
 
 	for(long i = 1; i <= chld_num; i++){
 
-			msg.mtype = i;
+		msg.mtype = i;
 
-			#ifdef DEBUG_PRINTS
-			printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
-			fflush(stdout);
-			#endif //! DEBUG_PRINTS
+		#ifdef DEBUG_PRINTS
+		printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
+		fflush(stdout);
+		#endif //! DEBUG_PRINTS
 
-			res = msgsnd(msqid, (void *) &msg, 0, 0); //< Parent notifies i-th child to make printf
-			if(res == -1){
-				perror("ERROR while parent sends messages to childs");
-				break;
-			}
+		res = msgsnd(msqid, (void *) &msg, 0, 0); //< Parent notifies i-th child to make printf
+		if(res == -1){
+			perror("ERROR while parent sends messages to childs");
+			break;
+		}
 			
-			maxlen = msgrcv(msqid, (void *) &msg, maxlen, msg_to_par_type, 0); //< Parent waits notification form child that it has made printf
-			if(msg.order_id != i){
-				fprintf(stderr, "ERROR: Wrong message from child! Should be %ld, but it is %ld\n", i, msg.order_id);
-				break;
-			}
+		maxlen = msgrcv(msqid, (void *) &msg, maxlen, msg_to_par_type, 0); //< Parent waits notification form child that printf has been maden
+		if(msg.order_id != i){
+			fprintf(stderr, "ERROR: Wrong message from child! Should be %ld, but it is %ld\n", i, msg.order_id);
+			break;
+		}
 
-			#ifdef DEBUG_PRINTS
-			printf("After PARENT get from child: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
-			fflush(stdout);
-			#endif //! DEBUG_PRINTS
+		#ifdef DEBUG_PRINTS
+		printf("After PARENT get from child: msqid = %d; msg.mtype = %ld; msg.order_id = %ld\n", msqid, msg.mtype, msg.order_id);
+		fflush(stdout);
+		#endif //! DEBUG_PRINTS
 
 	}
 	//! Parent kills message queue at the end
