@@ -173,11 +173,11 @@ int child_processing(key_t msqid, long total_chld_num, long order_id){
 	int res = msgrcv(msqid, (void *) &msg, 0, order_id, 0); //< Child waits notification form parent to start printfing
 	if(res == -1){
 		perror("ERROR in child while getting message from parent");
-		fflush(stderr);
 		return -1;
 	}
 
-	printf("[%ld] child PID = %d\n", order_id, getpid());
+	printf("%ld ", order_id);
+	fflush(stdout);
 
 	#ifdef DEBUG_PRINTS
 	printf("msqid = %d; msg.mtype = %ld;\n", msqid, msg.mtype);
