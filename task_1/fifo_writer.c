@@ -29,6 +29,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
+#include "common.h"
 
 const int num_argc = 2;
 
@@ -62,29 +64,19 @@ int make_global_fifo(){
 	return global_fifo_id;
 }
 
-FILE * make_file(const char * argv){
+int make_file(const char * argv){
 
-	if(argv == NULL){
-		fprintf(stderr, "Input argv is NULL in make_file()\n");
-		return NULL;
-	}
+	CHECK_ERR_NULL(argv, -1);
 
 	char * input_file_name = strdup(argv);
-	if(input_file_name == NULL){
-		fprintf(stderr, "Error during strdup() for input file name\n");
-		return NULL;
-	} 
+	CHECK_ERR_NULL(input_file_name, -2);
 
-	FILE * input_file = fopen(input_file_name, "r");
-	if (input_file == NULL){
-		fprintf(stderr, "Error while opening input file %s\n", input_file_name);
-		free(input_file_name);
-		return NULL;
-	}
+	int file_fd = open(input_file_name, O_RDONLY);
+	CHECK_ERR(file_fd, -3, "Error while opening input file", 1);
 
 	free(input_file_name);
 
-	return input_file;
+	return file_fd;
 }
 
 
@@ -189,13 +181,35 @@ int make_uniq_fifo(char * fifo_name){
 };
 
 
-int write_to_fifo(int fifo_id, const char * buf, size_t buf_len){
+int write_to_fifo(int file_fd, int fifo_id){
 
-	if(buf == NULL){
-		fprintf(stderr, "Input buffer is NULL\n");
-		return -2;
+	/*
+	CHECK_ERR_NULL(input_file, -2);
+
+	int res = fseek(input_file, 0L, SEEK_END);
+	CHECK_ERR(res, -3, "Can't fseek to end of input file", 1);
+	
+	long len = ftell(input_file);
+	CHECK_ERR(len, -4, "Ftell error", 1);
+	*/
+
+	long rd_res = 0;
+	long wr_res = 0;
+	char tmp_buf[PIPE_BUF] = {};
+
+	while ( ( rd_res = read(file_fd, tmp_buf, PIPE_BUF) ) > 0 ){
+
+		CHECK_ERR(rd_res, -15, "Error during reading from input file in writer", 1);
+
+		wr_res = write(fifo_id, tmp_buf, rd_res);
+		CHECK_ERR(wr_res, -14, "Error during writing to FIFO", 1);
+		if (wr_res == 0) {
+			break;
+		}
+
 	}
 
+	/*
 	size_t write_num = 0;
 	size_t new_len = buf_len;
 
@@ -221,6 +235,7 @@ int write_to_fifo(int fifo_id, const char * buf, size_t buf_len){
 	#ifdef DEBUG_PRINT_INFO
 	fprintf(stderr, "Write num = %ld\n", write_num);
 	#endif //! DEBUG_PRINT_INFO
+	*/
 
 	return 0;
 }
@@ -247,12 +262,13 @@ int main(int argc, char **argv){
 		return global_fifo_id;
 	}
 	//! Получаем указатель на входной файл
-	FILE * input_file = make_file(argv[1]);
-	if(input_file == NULL){
+	int file_fd = make_file(argv[1]);
+	if(file_fd < 0){
 		fprintf(stderr, "Can't open input file writer with PID = %d", getpid());
-		return -4;
+		return file_fd;
 	}
 	//! Считываем входной файл в промежуточный буфер
+	/*
 	char * file_data = NULL;
 	long res = read_file_to_buf(input_file, &file_data);
 	if (res < 0){
@@ -260,48 +276,44 @@ int main(int argc, char **argv){
 		fclose(input_file);
 		return res;
 	}
-
+	
 	long file_len = res;
+	*/
 
 	//! Создаем FIFO с уникальным именем в зависимости от PID writer-а для пары wrirer-reader
 	char fifo_name[BUF_MAX_SIZE] = {};
-	res = make_uniq_fifo(fifo_name);
+	int res = make_uniq_fifo(fifo_name);
 	if(res < 0){
-		fprintf(stderr, "Was error %ld in writer\n", res);
-		fclose(input_file);
-		free(file_data);
+		fprintf(stderr, "Was error %d in writer\n", res);
+		close(file_fd);
 		return res;
 	}
 	//! Посылаем через глобальный FIFO свой PID reader-у, по которому он откроет уникальную FIFO для чтения
 	res = send_pid(global_fifo_id);
 	if(res < 0){
-		fprintf(stderr, "Was error %ld in writer\n", res);
-		fclose(input_file);
-		free(file_data);
+		fprintf(stderr, "Was error %d in writer\n", res);
+		close(file_fd);
 		return res;
 	}
 	//! Открываем уникальную FIFO на запись
 	int fifo_id = open(fifo_name, O_WRONLY);
 	if(fifo_id < 1){
 		perror("Can't open file in writer:");
-		fclose(input_file);
-		free(file_data);
+		close(file_fd);
 		return -13;
 	}
 
 	#ifdef DEBUG_PRINT_INFO
 	printf("FIFO %s with id = %d was opened in writer\n", fifo_name, fifo_id);
 	#endif //! DEBUG_PRINT_INFO
+
 	//! Пишем данные в уникальную FIFO
-	res = write_to_fifo(fifo_id, file_data, file_len);
+	res = write_to_fifo(file_fd, fifo_id);
 	if (res < 0){
-		fprintf(stderr, "Was error %ld in writer\n", res);
-		fclose(input_file);
-		free(file_data);
+		fprintf(stderr, "Was error %d in writer\n", res);
+		close(file_fd);
 		return res;
 	}
-
-	free(file_data);
 
 	if ( remove(fifo_name) == -1 ){
 		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);

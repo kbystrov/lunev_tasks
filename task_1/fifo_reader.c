@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include "common.h"
 
 const char * global_fifo_name = "global_fifo";
 
