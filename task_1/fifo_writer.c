@@ -34,11 +34,6 @@
 
 const int num_argc = 2;
 
-#define FIFO_MODE 0666
-#define BUF_MAX_SIZE 100
-
-const char * global_fifo_name = "global_fifo";
-
 int make_global_fifo(){
 	//! Пытаемся создать глобальную FIFO для передачи PID процесса writer-а, если она еще не была создана
 	(void) umask(0);
@@ -79,75 +74,6 @@ int make_file(const char * argv){
 	return file_fd;
 }
 
-
-int read_file_to_buf(FILE * input_file, char ** buf){
-
-	if(input_file == NULL){
-		fprintf(stderr, "Input file is NULL\n");
-		return -5;
-	}
-
-	if(buf == NULL){
-		fprintf(stderr, "Input buffer is NULL\n");
-		return -6;
-	}
-
-	int res = fseek(input_file, 0L, SEEK_END);
-	if(res < 0){
-		perror("Can't fseek to end of input file");
-		return -7;
-	}
-	
-	long len = ftell(input_file);
-	if(len < 0){
-		fprintf(stderr, "Wrong size %ld input file\n", len);
-		perror("Writer error:");
-		return -8;
-	}
-
-	#ifdef DEBUG_PRINT_INFO
-	printf("File len = %ld\n", len);
-	#endif //! DEBUG_PRINT_INFO
-
-	res = fseek(input_file, 0L, SEEK_SET);
-	if(res < 0){
-		perror("Can't fseek to start of input file:");
-		return -9;
-	}
-
-	char * read_buf = malloc(len);
-	if(read_buf == NULL){
-		fprintf(stderr, "Can't allocate buffer of size = %ld bytes in child process\n", len);
-		return -10;
-	}
-
-	long read_num = 0;
-	long new_len = len;
-	
-	while (read_num < len){
-
-		res = fread(read_buf + read_num, 1, new_len, input_file);
-		if(res == 0){
-			break;
-		}
-
-		read_num += res;
-		new_len -= res;
-		if(new_len < 1){
-			break;
-		}
-
-	}
-
-	*buf = read_buf;
-
-	#ifdef DEBUG_PRINT_INFO
-	printf("Read num = %ld\n", read_num);
-	#endif //! DEBUG_PRINT_INFO
-
-	return read_num;
-}
-
 int make_uniq_fifo(char * fifo_name){
 
 	if(fifo_name == NULL){
@@ -157,7 +83,7 @@ int make_uniq_fifo(char * fifo_name){
 
 	(void) umask(0);
 
-	snprintf(fifo_name , BUF_MAX_SIZE, "fifo_%d", getpid());
+	snprintf(fifo_name , FIFO_NAME_MAX_SIZE, "fifo_%d", getpid());
 	printf("Writer creates unique FIFO name = %s\n", fifo_name);
 
 	repeat:
@@ -183,16 +109,6 @@ int make_uniq_fifo(char * fifo_name){
 
 int write_to_fifo(int file_fd, int fifo_id){
 
-	/*
-	CHECK_ERR_NULL(input_file, -2);
-
-	int res = fseek(input_file, 0L, SEEK_END);
-	CHECK_ERR(res, -3, "Can't fseek to end of input file", 1);
-	
-	long len = ftell(input_file);
-	CHECK_ERR(len, -4, "Ftell error", 1);
-	*/
-
 	long rd_res = 0;
 	long wr_res = 0;
 	char tmp_buf[PIPE_BUF] = {};
@@ -208,34 +124,6 @@ int write_to_fifo(int file_fd, int fifo_id){
 		}
 
 	}
-
-	/*
-	size_t write_num = 0;
-	size_t new_len = buf_len;
-
-	long res = 0;
-
-	while ( write_num < buf_len ){
-
-		res = write(fifo_id, buf + write_num, new_len);
-		if (res < 0){
-			perror("Error during writing to FIFO");
-			return -14;
-		} else if (res == 0) {
-			break;
-		}
-
-		write_num += res;
-		new_len -= res;
-		if(new_len < 1){
-			break;
-		}
-	}
-
-	#ifdef DEBUG_PRINT_INFO
-	fprintf(stderr, "Write num = %ld\n", write_num);
-	#endif //! DEBUG_PRINT_INFO
-	*/
 
 	return 0;
 }
@@ -267,21 +155,9 @@ int main(int argc, char **argv){
 		fprintf(stderr, "Can't open input file writer with PID = %d", getpid());
 		return file_fd;
 	}
-	//! Считываем входной файл в промежуточный буфер
-	/*
-	char * file_data = NULL;
-	long res = read_file_to_buf(input_file, &file_data);
-	if (res < 0){
-		fprintf(stderr, "Was error %ld in writer\n", res);
-		fclose(input_file);
-		return res;
-	}
-	
-	long file_len = res;
-	*/
 
 	//! Создаем FIFO с уникальным именем в зависимости от PID writer-а для пары wrirer-reader
-	char fifo_name[BUF_MAX_SIZE] = {};
+	char fifo_name[FIFO_NAME_MAX_SIZE] = {};
 	int res = make_uniq_fifo(fifo_name);
 	if(res < 0){
 		fprintf(stderr, "Was error %d in writer\n", res);

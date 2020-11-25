@@ -29,14 +29,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <limits.h>
 #include "common.h"
-
-const char * global_fifo_name = "global_fifo";
-
-#define BUF_SIZE 4096
-
-#define FIFO_MODE 0666
-#define MAX_NAME_SIZE 100
 
 int get_wr_pid(){
 	(void) umask(0);
@@ -63,7 +57,7 @@ int make_uniq_fifo_name(char * fifo_name, int wr_pid){
 		return -3;
 	}
 
-	snprintf(fifo_name , MAX_NAME_SIZE, "fifo_%d", wr_pid);
+	snprintf(fifo_name , FIFO_NAME_MAX_SIZE, "fifo_%d", wr_pid);
 
 	#ifdef DEBUG_PRINT_INFO
 	fprintf(stderr, "FIFO %s is made by reader pid = %d\n", fifo_name, getpid());
@@ -114,9 +108,9 @@ int main(){
 	//! Считываем FIFO 
 	long rd_res = 0;
 	long read_len = 0;
-	char buf[BUF_SIZE] = {};
+	char buf[PIPE_BUF] = {};
 
-	while ( (rd_res = read(fifo_id, buf, BUF_SIZE)) > 0 ) {
+	while ( (rd_res = read(fifo_id, buf, PIPE_BUF)) > 0 ) {
 		fwrite(buf, 1, rd_res, stdout);
 		read_len += rd_res;
 	}
