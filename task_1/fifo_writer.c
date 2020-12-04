@@ -175,13 +175,9 @@ int main(int argc, char **argv){
 		close(file_fd);
 		return res;
 	}
-	//! Открываем уникальную FIFO на запись
+	//! Открываем уникальную FIFO на запись в неблокирующем режиме, что бы избежать дедлока
 	int fifo_id = open(fifo_name, O_WRONLY);
-	if(fifo_id < 1){
-		perror("Can't open file in writer:");
-		close(file_fd);
-		return -13;
-	}
+	CHECK_ERR(fifo_id, ERR_WRITER_OPEN_UNIQ_FIFO_NBLK, "Can't open unique FIFO in non-blocking mode in writer:", 1);
 
 	#ifdef DEBUG_PRINT_INFO
 	printf("FIFO %s with id = %d was opened in writer\n", fifo_name, fifo_id);

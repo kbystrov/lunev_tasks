@@ -44,6 +44,8 @@ enum Errors{
     ERR_WRITER_MAKE_UNIQ_FIFO_MKFIFO_RMV,
     //! Error in writer in make_uniq_fifo(char * fifo_name): error while creating unique FIFO
     ERR_WRITER_MAKE_UNIQ_FIFO_MKFIFO_OTHER,
+    //! Error in writer in main: error while opening unique FIFO in non-blocking mode
+    ERR_WRITER_OPEN_UNIQ_FIFO_NBLK,
 };
 
 
