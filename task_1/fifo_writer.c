@@ -40,34 +40,35 @@ int make_global_fifo(){
 	errno = 0;
 	if (mkfifo(global_fifo_name, (FIFO_MODE) ) != 0 ){
 		if(errno == EEXIST){
+			#ifdef DEBUG_PRINT_INFO
         	printf("Global FIFO was created by another process\n");
+			#endif //! DEBUG_PRINT_INFO
 		} else {
 			fprintf(stderr, "ERROR while creating global FIFO");
-			return -2;
+			return ERR_WRITER_MAKE_GLOBAL_FIFO_MKFIFO;
 		}
     } else {
+		#ifdef DEBUG_PRINT_INFO
 		printf("Global FIFO was created by PID = %d\n", getpid());
+		#endif //! DEBUG_PRINT_INFO
 	}
 	errno = 0;
 	//! Открываем ее для передачи и получаем ее FD, что бы потом передать туда свой PID reader-у 
 	int global_fifo_id = open(global_fifo_name, O_WRONLY);
-	if(global_fifo_id < 1){
-		perror("Can't open file in writer:");
-		return -3;
-	}
+	CHECK_ERR(global_fifo_id, ERR_WRITER_MAKE_GLOBAL_FIFO_OPEN, "Can't open file in writer:", 1);
 
 	return global_fifo_id;
 }
 
 int make_file(const char * argv){
 
-	CHECK_ERR_NULL(argv, -1);
+	CHECK_ERR_NULL(argv, ERR_WRITER_MAKE_FILE_ARG);
 
 	char * input_file_name = strdup(argv);
-	CHECK_ERR_NULL(input_file_name, -2);
+	CHECK_ERR_NULL(input_file_name, ERR_WRITER_MAKE_FILE_STRDUP);
 
 	int file_fd = open(input_file_name, O_RDONLY);
-	CHECK_ERR(file_fd, -3, "Error while opening input file", 1);
+	CHECK_ERR(file_fd, ERR_WRITER_MAKE_FILE_OPEN, "Error while opening input file", 1);
 
 	free(input_file_name);
 
@@ -76,25 +77,29 @@ int make_file(const char * argv){
 
 int make_uniq_fifo(char * fifo_name){
 
-	if(fifo_name == NULL){
-		fprintf(stderr, "NULL input buffer in make_uniq_fifo()\n");
-		return -11;
-	}
+	CHECK_ERR_NULL(fifo_name, ERR_WRITER_MAKE_UNIQ_FIFO_ARG);
 
 	(void) umask(0);
-
 	snprintf(fifo_name , FIFO_NAME_MAX_SIZE, "fifo_%d", getpid());
+	#ifdef DEBUG_PRINT_INFO
 	printf("Writer creates unique FIFO name = %s\n", fifo_name);
+	#endif //! DEBUG_PRINT_INFO
 
+	int try_left = 5;
 	repeat:
 	errno = 0;
 	if (mkfifo(fifo_name, (FIFO_MODE) ) == -1){
 		if(errno == EEXIST){
-			remove(fifo_name);
-			goto repeat;
+			if(try_left > 0 ){
+				remove(fifo_name);
+				try_left--;
+				goto repeat;
+			} else {
+				return ERR_WRITER_MAKE_UNIQ_FIFO_MKFIFO_RMV;
+			}
 		} else {
-        	perror("Unique FIFO already exists");
-        	return -12;
+        	perror("ERROR while creating unique FIFO in writer");
+        	return ERR_WRITER_MAKE_UNIQ_FIFO_MKFIFO_OTHER;
 		}
     }
 	errno = 0;
@@ -141,13 +146,7 @@ int main(int argc, char **argv){
 
 	if(argc != num_argc){
 		printf("Wrong number of argc = %d! Should be %d!\n", argc, num_argc);
-		return -1;
-	}
-	//! Создаем глобальный FIFO для передачи своего PID reader-у
-	int global_fifo_id = make_global_fifo();
-	if(global_fifo_id < 1){
-		fprintf(stderr, "Can't open global FIFO in writer with PID = %d", getpid());
-		return global_fifo_id;
+		return ERR_WRITER_ARGC;
 	}
 	//! Получаем указатель на входной файл
 	int file_fd = make_file(argv[1]);
@@ -155,7 +154,12 @@ int main(int argc, char **argv){
 		fprintf(stderr, "Can't open input file writer with PID = %d", getpid());
 		return file_fd;
 	}
-
+	//! Создаем глобальный FIFO для передачи своего PID reader-у
+	int global_fifo_id = make_global_fifo();
+	if(global_fifo_id < 1){
+		fprintf(stderr, "Can't open global FIFO in writer with PID = %d", getpid());
+		return global_fifo_id;
+	}
 	//! Создаем FIFO с уникальным именем в зависимости от PID writer-а для пары wrirer-reader
 	char fifo_name[FIFO_NAME_MAX_SIZE] = {};
 	int res = make_uniq_fifo(fifo_name);
