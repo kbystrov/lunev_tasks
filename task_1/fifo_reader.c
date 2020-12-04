@@ -32,80 +32,121 @@
 #include <limits.h>
 #include "common.h"
 
-int get_wr_pid(){
+int make_global_fifo(){
+	//! Пытаемся создать глобальную FIFO для передачи PID процесса reader-а, если она еще не была создана
 	(void) umask(0);
-	//! Открываем глобальную FIFO для получения PID writer-а
-	int global_fifo_id = open(global_fifo_name, O_RDONLY);
-	if(global_fifo_id < 1){
-		fprintf(stderr, "Can't open global FIFO in reader");
-		return -1;
+	errno = 0;
+	if (mkfifo(global_fifo_name, (FIFO_MODE) ) != 0 ){
+		if(errno == EEXIST){
+			#ifdef DEBUG_PRINT_INFO
+        	printf("Global FIFO was created by another process\n");
+			#endif //! DEBUG_PRINT_INFO
+		} else {
+			fprintf(stderr, "ERROR while creating global FIFO");
+			return (-ERR_READER_MAKE_GLOBAL_FIFO_MKFIFO);
+		}
+    } else {
+		#ifdef DEBUG_PRINT_INFO
+		printf("Global FIFO was created by PID = %d\n", getpid());
+		#endif //! DEBUG_PRINT_INFO
 	}
-	//! Считываем PID очередного writer-а
-	int wr_pid = 0;
-	int res = read(global_fifo_id, &wr_pid, sizeof(int));
-	if(res < 0){
-		perror("Error while opening global FIFO in reader");
-		return -2;
-	}
-	return wr_pid;
+	errno = 0;
+	//! Открываем ее для передачи и получаем ее FD, что бы потом передать туда свой PID writer-у 
+	int global_fifo_id = open(global_fifo_name, O_WRONLY);
+	CHECK_ERR(global_fifo_id, ERR_READER_MAKE_GLOBAL_FIFO_OPEN, "Can't open file in writer:", 1);
+
+	return global_fifo_id;
 }
 
-int make_uniq_fifo_name(char * fifo_name, int wr_pid){
+int make_uniq_fifo(char * fifo_name){
 
-	if(fifo_name == NULL){
-		fprintf(stderr, "NULL input buffer in make_uniq_fifo()\n");
-		return -3;
-	}
+	CHECK_ERR_NULL(fifo_name, ERR_READER_MAKE_UNIQ_FIFO_ARG);
 
-	snprintf(fifo_name , FIFO_NAME_MAX_SIZE, "fifo_%d", wr_pid);
+	(void) umask(0);
+	snprintf(fifo_name , FIFO_NAME_MAX_SIZE, "fifo_%d", getpid());
+	#ifdef DEBUG_PRINT_INFO
+	printf("Reader creates unique FIFO name = %s\n", fifo_name);
+	#endif //! DEBUG_PRINT_INFO
+
+	int try_left = 5;
+	repeat:
+	errno = 0;
+	if (mkfifo(fifo_name, (FIFO_MODE) ) == -1){
+		if(errno == EEXIST){
+			if(try_left > 0 ){
+				remove(fifo_name);
+				try_left--;
+				goto repeat;
+			} else {
+				return (-ERR_READER_MAKE_UNIQ_FIFO_MKFIFO_RMV);
+			}
+		} else {
+        	perror("ERROR while creating unique FIFO in reader");
+        	return (-ERR_READER_MAKE_UNIQ_FIFO_MKFIFO_OTHER);
+		}
+    }
+	errno = 0;
 
 	#ifdef DEBUG_PRINT_INFO
-	fprintf(stderr, "FIFO %s is made by reader pid = %d\n", fifo_name, getpid());
+	printf("FIFO %s is made by writer pid = %d\n", fifo_name, getpid());
 	#endif //! DEBUG_PRINT_INFO
 
 	return 0;
 };
 
-int main(){
-
-	//! Открываем глобальную FIFO для получения PID writer-а и считываем его
-	int wr_pid = get_wr_pid();
-	if(wr_pid < 0){
-		fprintf(stderr, "Error while opening global FIFO in reader\n");
-		return wr_pid;
+int send_pid(int fd){
+	int pid = getpid();
+	int res = write(fd, &pid, sizeof(int));
+	CHECK_ERR(res, ERR_READER_SEND_PID_WRITE, "ERROR in reader while sending its PID to writer", 1);
+	if(res != sizeof(int)){
+		return (-ERR_READER_SEND_PID_WSIZE);
 	}
-	//! Получаем имя уникального FIFO по PID-у writer-а
-	char fifo_name[100] = {};
-	int res = make_uniq_fifo_name(fifo_name, wr_pid);
-	if(res < 0){
-		fprintf(stderr, "Error while making unique FIFO name in reader");
+	return res;
+}
+
+int main(){
+	
+	//! Создаем глобальный FIFO для передачи своего PID writer-у
+	int global_fifo_id = make_global_fifo();
+	if(global_fifo_id < 1){
+		fprintf(stderr, "Can't open global FIFO in reader with PID = %d", getpid());
+		return global_fifo_id;
+	}
+
+	//! Создаем FIFO с уникальным именем в зависимости от PID reader-а для пары wrirer-reader
+	char fifo_name[FIFO_NAME_MAX_SIZE] = {};
+	int res = make_uniq_fifo(fifo_name);
+	if (res < 0){
+		fprintf(stderr, "ERROR = %d in reader at %s: %s in %d line\n", res, __FILE__, __PRETTY_FUNCTION__, __LINE__);
 		return res;
 	}
-	
+
+	//! Открываем уникальную FIFO для пары writer-reader в неблокирующем режиме, что бы предотвратить дедлок
 	(void) umask(0);
-	//! Открываем уникальную FIFO для пары writer-reader
-	int fifo_id = open(fifo_name, O_RDONLY);
-	if(fifo_id < 0){
-		perror("ERROR while opening unique FIFO in reader");
-		return -4;
+	int fifo_id = open(fifo_name, O_RDONLY | O_NONBLOCK);
+	CHECK_ERR(fifo_id, ERR_READER_UNIQFIFO_OPEN_NBLK , "ERROR while opening unique FIFO in reader in non-blocking mode", 1);
+	
+	//! Через fnctl меняем на блокирующий режим, что бы нормально передавать данные
+	res = fcntl(fifo_id, F_SETFL, O_RDONLY);
+	if(res == -1){
+		close(global_fifo_id);
+		remove(fifo_name);
+		CHECK_ERR(res, ERR_READER_FCNTL, "ERROR in reader while changing unique FIFO flags", 1);
 	}
 
-	#ifdef DEBUG_PRINT_INFO
-	fprintf(stderr, "FIFO %d was opened in reader: %s\n", fifo_id, fifo_name);
-	#endif //! DEBUG_PRINT_INFO
-
-	//! Сразу вызываем remove для FIFO, что бы удалилось после смерти процессов
-	if ( remove(fifo_name) == -1 ){
-		fprintf(stderr, "FIFO %s with id = %d in reader\n", fifo_name, fifo_id);
-		perror("Can't remove FIFO in writer");
-        return -5;
+	//! Посылаем через глобальный FIFO свой PID writer-у, по которому он откроет уникальную FIFO для записи
+	res = send_pid(global_fifo_id);
+	if(res < 0){
+		fprintf(stderr, "Was error %d in reader\n", res);
+		close(global_fifo_id);
+		remove(fifo_name);
+		return res;
 	}
 
-	#ifdef DEBUG_PRINT_INFO
-	fprintf(stderr, "FIFO %d was removed in reader\n", fifo_id);
-	#endif //! DEBUG_PRINT_INFO
+	//! Даем время writer-у на открытие уникальной FIFO
+	sleep(5);
 
-	//! Считываем FIFO 
+	//! Считываем данные из FIFO и печатаем их в stdout 
 	long rd_res = 0;
 	long read_len = 0;
 	char buf[PIPE_BUF] = {};
@@ -119,12 +160,8 @@ int main(){
 	fprintf(stderr, "Reader has read %ld bytes\n", read_len);
 	#endif //! DEBUG_PRINT_INFO
 
-	close(fifo_id);
-	if (res < 0){
-		fprintf(stderr, "Error result %d while reading in parent process\n", res);
-		perror("Errno message:");
-		return -6;
-	}
+	res = remove(fifo_name);
+	CHECK_ERR(res, ERR_READER_UNIQ_FIFO_RMV, "ERROR while removing unique FIFO in reader", 1);
 	
 	return 0;
 }
