@@ -1,7 +1,7 @@
 /*
- * fork_n_child.c
+* fifo_reader.c
  * 
- * Copyright 2020 Student <student@client112>
+ * Copyright 2020 Kirill Bystrov <kirill.bystrov@phystech.edu>
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@
 #include <sys/file.h>
 #include <limits.h>
 #include "common.h"
+
 
 int make_global_fifo(){
 	//! Пытаемся создать глобальную FIFO для передачи PID процесса reader-а, если она еще не была создана
@@ -104,6 +105,34 @@ int send_pid(int fd){
 	return res;
 }
 
+int check_wr_end(int fifo_id){
+	fd_set rfds;
+    struct timeval tv;
+    int retval;
+
+	int try_num = 7;
+
+	while(try_num > 0){
+		tv.tv_sec = 1;
+    	tv.tv_usec = 0;
+
+		FD_ZERO(&rfds);
+    	FD_SET(fifo_id, &rfds);
+
+		retval = select(fifo_id + 1, &rfds, NULL, NULL, &tv);
+		CHECK_ERR(retval, ERR_READER_CHECK_WR_END, "ERROR in reader while call select for writer end", 1);
+
+		if (retval && FD_ISSET(fifo_id, &rfds) ){
+            return 0;
+		} else {
+			try_num--;
+		}
+
+	}
+
+	return -1;
+}
+
 int main(){
 	
 	//! Создаем глобальный FIFO для передачи своего PID writer-у
@@ -143,8 +172,14 @@ int main(){
 		return res;
 	}
 
-	//! Даем время writer-у на открытие уникальной FIFO
-	sleep(5);
+	//! Ждем когда writer будет готов к записи, опрашивая его через select фикс. число попыток
+	res = check_wr_end(fifo_id);
+	close(global_fifo_id);
+	if(res == -1){
+		remove(fifo_name);
+		fprintf(stderr, "ERROR in reader: writer is not ready\n");
+		return res;
+	}
 
 	//! Считываем данные из FIFO и печатаем их в stdout 
 	long rd_res = 0;
@@ -159,9 +194,6 @@ int main(){
 	#ifdef DEBUG_PRINT_INFO
 	fprintf(stderr, "Reader has read %ld bytes\n", read_len);
 	#endif //! DEBUG_PRINT_INFO
-
-	res = remove(fifo_name);
-	CHECK_ERR(res, ERR_READER_UNIQ_FIFO_RMV, "ERROR while removing unique FIFO in reader", 1);
 	
 	return 0;
 }

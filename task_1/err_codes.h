@@ -68,6 +68,12 @@ enum Errors{
     ERR_WRITER_UNIQ_FIFO_RMV,
     //! Error in reader in main: error while removing unique FIFO
     ERR_READER_UNIQ_FIFO_RMV,
+    //! Error in writer in write_to_fifo(int file_fd, int fifo_id): error during writing to FIFO
+    ERR_WRITER_WRITE_TO_FIFO_WR,
+    //! Error in writer in write_to_fifo(int file_fd, int fifo_id): error during reading to FIFO
+    ERR_WRITER_WRITE_TO_FIFO_RD,
+    //! Error in reader in write_to_fifo(int file_fd, int fifo_id): error during reading to FIFO
+    ERR_READER_CHECK_WR_END,
 
 };
 

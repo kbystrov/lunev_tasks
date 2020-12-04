@@ -87,15 +87,15 @@ int write_to_fifo(int file_fd, int fifo_id){
 
 	while ( ( rd_res = read(file_fd, tmp_buf, PIPE_BUF) ) > 0 ){
 
-		CHECK_ERR(rd_res, -15, "Error during reading from input file in writer", 1);
-
 		wr_res = write(fifo_id, tmp_buf, rd_res);
-		CHECK_ERR(wr_res, -14, "Error during writing to FIFO", 1);
+		CHECK_ERR(wr_res, ERR_WRITER_WRITE_TO_FIFO_WR, "Error during writing to FIFO", 1);
 		if (wr_res == 0) {
 			break;
 		}
 
 	}
+
+	CHECK_ERR(rd_res, ERR_WRITER_WRITE_TO_FIFO_RD, "Error during reading from input file in writer", 1);
 
 	return 0;
 }
@@ -140,8 +140,8 @@ int main(int argc, char **argv){
 	//! Через fnctl меняем на блокирующий режим, что бы нормально передавать данные
 	res = fcntl(fifo_id, F_SETFL, O_WRONLY);
 	if(res == -1){
+		close(file_fd);
 		close(fifo_id);
-		remove(fifo_name);
 		CHECK_ERR(res, ERR_WRITER_FCNTL, "ERROR in writer while changing unique FIFO flags", 1);
 	}
 
@@ -153,26 +153,15 @@ int main(int argc, char **argv){
 	res = write_to_fifo(file_fd, fifo_id);
 	if (res < 0){
 		fprintf(stderr, "Was error %d in writer\n", res);
-		close(file_fd);
-		return res;
-	}
-
-	if ( remove(fifo_name) == -1 ){
-		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);
-		perror("Can't remove FIFO in writer");
-        return -16;
 	}
 
 	#ifdef DEBUG_PRINT_INFO
 	printf("FIFO %s with id = %d was removed in writer\n", fifo_name, fifo_id);
 	#endif //! DEBUG_PRINT_INFO
 
-	if ( close(fifo_id) == -1){
-		fprintf(stderr, "FIFO %s with id = %d in writer\n", fifo_name, fifo_id);
-		perror("Can't close FIFO in writer");
-        return -17;
-	}
+	close(file_fd);
+	close(fifo_id);
 	
-	return 0;
+	return res;
 }
 
