@@ -15,8 +15,7 @@
 /** @file */
 
 #define PERM_MODE 0666
-
-const size_t PAGE_SIZE = 4096;
+#define PAGE_SIZE 4096
 
 const char * key_name = "err_codes.h";
 
@@ -33,6 +32,19 @@ enum Sems{
     SEM_FINISH,
     SEM_NUM
 };
+
+typedef struct shm_buf{
+    size_t len;
+    char buf[PAGE_SIZE];
+} shm_buf;
+
+union semun {
+    int              val;    /* Value for SETVAL */
+    struct semid_ds *buf;    /* Buffer for IPC_STAT, IPC_SET */
+    unsigned short  *array;  /* Array for GETALL, SETALL */
+    struct seminfo  *__buf;  /* Buffer for IPC_INFO (Linux-specific) */
+};
+
 
 struct sembuf sem_wr_start[2] = {
     {SEM_WRITER, 0, 0},
@@ -52,12 +64,22 @@ struct sembuf sem_rd_finish[1] = {
     {SEM_READER, -1, 0},
 }; 
 
+struct sembuf sem_wr_wait_rd[2] = {
+    {SEM_READER, -1, SEM_UNDO},
+    {SEM_READER, 1, SEM_UNDO},
+};
+
+struct sembuf sem_rd_wait_wr[2] = {
+    {SEM_WRITER, -1, SEM_UNDO},
+    {SEM_WRITER, 1, SEM_UNDO},
+};
+
 
 int init_shmem(key_t key, char ** shm_addr){
 
     CHECK_ERR_NULL(shm_addr, ERR_SHMEM_SEM_INIT_SHMEM_INPUT);
 
-    int shm_id = shmget(key, PAGE_SIZE, PERM_MODE | IPC_CREAT);
+    int shm_id = shmget(key, sizeof(shm_buf), PERM_MODE | IPC_CREAT);
     CHECK_ERR(shm_id, ERR_SHMEM_SEM_SHMEGET, "Error while getting shared memory", 1);
 
     char * tmp_addr = shmat(shm_id, NULL, 0);

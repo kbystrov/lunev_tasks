@@ -46,10 +46,30 @@ int main(int argc, char ** argv) {
     //! Получаем семафоры
     int sem_id = semget(key, SEM_NUM, PERM_MODE | IPC_CREAT);
     CHECK_ERR(sem_id, ERR_SHMEM_SEM_SEMGET, "Error while getting semaphores set", 1);
+
     //! Ждем, пока не займем семафор для писателя (Гарантирует единственного активного писателя)
     res = semop(sem_id, sem_wr_start, SEM_STRUCT_SIZE(sem_wr_start) );
     CHECK_ERR(res, ERR_SHMEM_WR_CHECK, "Error while starting writer", 1);
 
+    //! Ждем готовность читателя
+    res = semop(sem_id, sem_wr_wait_rd, SEM_STRUCT_SIZE(sem_wr_wait_rd) );
+    CHECK_ERR(res, ERR_SHMEM_WR_WAIT_RD, "Error while waiting reader in writer", 1);
+
+    //! Устанавливаем семафор окончания передачи в ноль 
+    union semun arg;
+    arg.val = 0;
+    res = semctl(sem_id, SEM_FINISH, SETVAL, arg);
+    CHECK_ERR(res, ERR_SHMEM_SEMCTL_FINISH, "Error while setting SEM_FINISH to 0", 1);
+
+    //! Цикл чтения из файла и передачи данных читателю
+    //while(1){
+        //! produce_item(tmp_buf);
+        //! P(empty);
+        //! P(mutex);
+        //! put_item();
+        //! V(mutex);
+        //! V(full);
+    //}
 
     //! Освобождаем ресурсы и "отпускаем" семафоры писателя
     res = semop(sem_id, sem_wr_finish, SEM_STRUCT_SIZE(sem_wr_finish) );
