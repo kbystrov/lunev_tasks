@@ -51,11 +51,11 @@ struct sembuf sem_p_mutex[1] = {
 };
 
 struct sembuf sem_v_mutex[1] = {
-    {SEM_MUTEX, 1, 0},
+    {SEM_MUTEX, 1, SEM_UNDO},
 };
 
 struct sembuf sem_p_full[1] = {
-    {SEM_FULL, -1, SEM_UNDO},
+    {SEM_FULL, -1, 0},
 };
 
 struct sembuf sem_v_full[1] = {
