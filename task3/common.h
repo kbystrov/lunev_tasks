@@ -62,8 +62,8 @@ extern struct sembuf sem_v_mutex[1];
 extern struct sembuf sem_p_full[1];
 extern struct sembuf sem_v_full[1];
 extern struct sembuf sem_p_full[1];
-extern struct sembuf sem_wr_check_rd_alive[1];
-extern struct sembuf sem_rd_check_wr_alive[1];
+extern struct sembuf sem_wr_check_rd_alive[2];
+extern struct sembuf sem_rd_check_wr_alive[2];
 
 int init_shmem(key_t key, char ** shm_addr);
 

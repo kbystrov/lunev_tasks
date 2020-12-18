@@ -35,7 +35,7 @@ int main() {
         if(res == -1){
             break;
         }
-        //! Проверяем жив ли gbcfnt
+        //! Проверяем жив ли писатель
         res = semop(sem_id, sem_rd_check_wr_alive, SEM_STRUCT_SIZE(sem_rd_check_wr_alive) );
         if(res == -1){
             break;
