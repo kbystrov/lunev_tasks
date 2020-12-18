@@ -27,7 +27,7 @@ int main() {
     CHECK_ERR(res, ERR_SHMEM_RD_WAIT_WR, "Error while waiting writer in reader", 1);
 
     //! Освобождаем ресурсы и "отпускаем" семафоры читателя
-    res = semop(sem_id, sem_rd_finish, SEM_STRUCT_SIZE(sem_rd_finish) );
+    res = semop(sem_id, sem_rd_end, SEM_STRUCT_SIZE(sem_rd_end) );
     CHECK_ERR(res, ERR_SHMEM_RD_END, "Error while free reader semaphores", 1);
 
     res = shmdt(shm_addr);

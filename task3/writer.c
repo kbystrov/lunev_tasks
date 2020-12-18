@@ -17,6 +17,16 @@ int make_file(const char * argv){
 	return file_fd;
 }
 
+int produce_item(char * buf, int fd){
+
+    CHECK_ERR_NULL(buf, ERR_SHMEM_PRODUCE_ITEM_INPUT);
+
+    int res = read(fd, buf, PAGE_SIZE);
+    CHECK_ERR(res, ERR_SHMEM_PRODUCE_ITEM_READ, "Error while reading from file", 1);
+
+    return res;
+}
+
 int main(int argc, char ** argv) {
 
     if(argc < num_argc){
@@ -61,18 +71,39 @@ int main(int argc, char ** argv) {
     res = semctl(sem_id, SEM_FINISH, SETVAL, arg);
     CHECK_ERR(res, ERR_SHMEM_SEMCTL_FINISH, "Error while setting SEM_FINISH to 0", 1);
 
+    shm_buf tmp_buf = {};
+
     //! Цикл чтения из файла и передачи данных читателю
-    //while(1){
-        //! produce_item(tmp_buf);
+    while(1){
+        //! Читаем данные из файла в буфер
+        res = produce_item(tmp_buf.buf, file_fd);
+        if(res < 0){ //< Ошибка при чтении файла
+            perror("Error while procuding item");
+            break;
+        } else if (res == 0){ //< EOF. Уведомляем читателя об окончании передачи данных
+            res = semop(sem_id, sem_wr_finish, SEM_STRUCT_SIZE(sem_wr_finish) );
+            CHECK_ERR_NORET(res, ERR_SHMEM_WR_FINISH, "Error while notifying reader about the finish of transmitting", 1);
+            break;
+        }
+        tmp_buf.len = res;
         //! P(empty);
+        res = semop(sem_id, sem_p_empty, SEM_STRUCT_SIZE(sem_p_empty) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_P_EMPTY, "Error while P(empty) in writer", 1);
         //! P(mutex);
+        res = semop(sem_id, sem_p_mutex, SEM_STRUCT_SIZE(sem_p_mutex) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_P_MUTEX, "Error while P(mutex) in writer", 1);
         //! put_item();
+        memcpy(shm_addr, &tmp_buf, sizeof(tmp_buf));
         //! V(mutex);
+        res = semop(sem_id, sem_v_mutex, SEM_STRUCT_SIZE(sem_v_mutex) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_V_MUTEX, "Error while V(mutex) in writer", 1);
         //! V(full);
-    //}
+        res = semop(sem_id, sem_v_full, SEM_STRUCT_SIZE(sem_v_full) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_V_FULL, "Error while V(full) in writer", 1);
+    }
 
     //! Освобождаем ресурсы и "отпускаем" семафоры писателя
-    res = semop(sem_id, sem_wr_finish, SEM_STRUCT_SIZE(sem_wr_finish) );
+    res = semop(sem_id, sem_wr_end, SEM_STRUCT_SIZE(sem_wr_end) );
     CHECK_ERR(res, ERR_SHMEM_WR_END, "Error while free writer semaphores", 1);
 
     res = shmdt(shm_addr);

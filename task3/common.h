@@ -9,6 +9,7 @@
 #include <sys/sem.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "err_codes.h"
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -56,11 +57,11 @@ struct sembuf sem_rd_start[2] = {
     {SEM_READER, 1, SEM_UNDO},
 }; 
 
-struct sembuf sem_wr_finish[1] = {
+struct sembuf sem_wr_end[1] = {
     {SEM_WRITER, -1, 0},
 }; 
 
-struct sembuf sem_rd_finish[1] = {
+struct sembuf sem_rd_end[1] = {
     {SEM_READER, -1, 0},
 }; 
 
@@ -73,6 +74,39 @@ struct sembuf sem_rd_wait_wr[2] = {
     {SEM_WRITER, -1, SEM_UNDO},
     {SEM_WRITER, 1, SEM_UNDO},
 };
+
+struct sembuf sem_wr_finish[1] = {
+    {SEM_FINISH, 1, 0},
+};
+
+struct sembuf sem_rd_finish[1] = {
+    {SEM_FINISH, 0, IPC_NOWAIT},
+};
+
+struct sembuf sem_p_empty[1] = {
+    {SEM_EMPTY, -1, SEM_UNDO},
+};
+
+struct sembuf sem_v_empty[1] = {
+    {SEM_EMPTY, 1, 0},
+};
+
+struct sembuf sem_p_mutex[1] = {
+    {SEM_MUTEX, -1, SEM_UNDO},
+};
+
+struct sembuf sem_v_mutex[1] = {
+    {SEM_MUTEX, 1, 0},
+};
+
+struct sembuf sem_p_full[1] = {
+    {SEM_FULL, -1, SEM_UNDO},
+};
+
+struct sembuf sem_v_full[1] = {
+    {SEM_FULL, 1, 0},
+};
+
 
 
 int init_shmem(key_t key, char ** shm_addr){

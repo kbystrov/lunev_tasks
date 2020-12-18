@@ -16,6 +16,15 @@
                         return (-err_code);    \
                     }
 
+#define CHECK_ERR_NORET(res, err_code, msg, perr_flag)   \
+                    if(res == -1){   \
+                        fprintf(stderr, "ERROR = %d (%s) at %s: %s in %d line\n", err_code, (msg), __FILE__, __PRETTY_FUNCTION__, __LINE__);   \
+                        if(perr_flag){  \
+                            perror( (msg) );    \
+                        }   \
+                        break; \
+                    }
+
 #define CHECK_ERR_NULL(arg, err_code)   \
                     if(arg == NULL){   \
                         fprintf(stderr, "Input arg %s is NULL at %s: %s in %d line\n", (#arg) , __FILE__, __PRETTY_FUNCTION__, __LINE__);   \
@@ -43,6 +52,13 @@ enum Errors{
     ERR_SHMEM_SEMCTL_FINISH,
     ERR_SHMEM_WR_WAIT_RD,
     ERR_SHMEM_RD_WAIT_WR,
+    ERR_SHMEM_PRODUCE_ITEM_READ,
+    ERR_SHMEM_PRODUCE_ITEM_INPUT,
+    ERR_SHMEM_WR_FINISH,
+    ERR_SHMEM_P_EMPTY,
+    ERR_SHMEM_P_MUTEX,
+    ERR_SHMEM_V_MUTEX,
+    ERR_SHMEM_V_FULL,
 };
 
 
