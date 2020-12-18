@@ -27,6 +27,29 @@ int produce_item(char * buf, int fd){
     return res;
 }
 
+int sem_init(int sem_id){
+
+    union semun arg;
+
+    arg.val = 0;
+    int res = semctl(sem_id, SEM_FINISH, SETVAL, arg);
+    CHECK_ERR(res, ERR_SHMEM_SEMCTL_FINISH, "Error while setting SEM_FINISH to 0", 1);
+
+    arg.val = 1;
+    res = semctl(sem_id, SEM_MUTEX, SETVAL, arg);
+    CHECK_ERR(res, ERR_SHMEM_SEMINIT_MUTEX, "Error while initializing start values for semaphores", 1);
+
+    arg.val = 1;
+    res = semctl(sem_id, SEM_EMPTY, SETVAL, arg);
+    CHECK_ERR(res, ERR_SHMEM_SEMINIT_EMPTY, "Error while initializing start values for semaphores", 1);
+
+    arg.val = 0;
+    res = semctl(sem_id, SEM_FULL, SETVAL, arg);
+    CHECK_ERR(res, ERR_SHMEM_SEMINIT_FULL, "Error while initializing start values for semaphores", 1);
+
+    return res;
+}
+
 int main(int argc, char ** argv) {
 
     if(argc < num_argc){
@@ -65,11 +88,9 @@ int main(int argc, char ** argv) {
     res = semop(sem_id, sem_wr_wait_rd, SEM_STRUCT_SIZE(sem_wr_wait_rd) );
     CHECK_ERR(res, ERR_SHMEM_WR_WAIT_RD, "Error while waiting reader in writer", 1);
 
-    //! Устанавливаем семафор окончания передачи в ноль 
-    union semun arg;
-    arg.val = 0;
-    res = semctl(sem_id, SEM_FINISH, SETVAL, arg);
-    CHECK_ERR(res, ERR_SHMEM_SEMCTL_FINISH, "Error while setting SEM_FINISH to 0", 1);
+    //! Инициализируем семафоры перед началом передачи аднных
+    res = sem_init(sem_id);
+    CHECK_ERR(res, res, "Error while waiting reader in writer", 1);
 
     shm_buf tmp_buf = {};
 

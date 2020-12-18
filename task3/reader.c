@@ -26,6 +26,31 @@ int main() {
     res = semop(sem_id, sem_rd_wait_wr, SEM_STRUCT_SIZE(sem_rd_wait_wr) );
     CHECK_ERR(res, ERR_SHMEM_RD_WAIT_WR, "Error while waiting writer in reader", 1);
 
+    shm_buf * tmp_buf = (shm_buf *) shm_addr;
+
+    //! Цикл чтения из разделяемой памяти и печать в stdout
+    while(1){
+        //! Проверяем SEM_FINISH - выходим если конец передачи
+        res = semop(sem_id, sem_rd_finish, SEM_STRUCT_SIZE(sem_rd_finish) );
+        if(res == -1){
+            break;
+        }
+        //! P(full);
+        res = semop(sem_id, sem_p_full, SEM_STRUCT_SIZE(sem_p_empty) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_P_FULL, "Error while P(full) in wrreaderiter", 1);
+        //! P(mutex);
+        res = semop(sem_id, sem_p_mutex, SEM_STRUCT_SIZE(sem_p_mutex) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_P_MUTEX, "Error while P(mutex) in reader", 1);
+        //! get_item()
+        write(STDOUT_FILENO, tmp_buf->buf, tmp_buf->len);
+        //! V(mutex);
+        res = semop(sem_id, sem_v_mutex, SEM_STRUCT_SIZE(sem_v_mutex) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_V_MUTEX, "Error while V(mutex) in reader", 1);
+        //! V(empty);
+        res = semop(sem_id, sem_v_empty, SEM_STRUCT_SIZE(sem_v_full) );
+        CHECK_ERR_NORET(res, ERR_SHMEM_V_EMPTY, "Error while V(empty) in reader", 1);
+    }
+
     //! Освобождаем ресурсы и "отпускаем" семафоры читателя
     res = semop(sem_id, sem_rd_end, SEM_STRUCT_SIZE(sem_rd_end) );
     CHECK_ERR(res, ERR_SHMEM_RD_END, "Error while free reader semaphores", 1);
