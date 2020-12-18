@@ -96,6 +96,11 @@ int main(int argc, char ** argv) {
 
     //! Цикл чтения из файла и передачи данных читателю
     while(1){
+        //! Проверяем жив ли читатель
+        res = semop(sem_id, sem_wr_check_rd_alive, SEM_STRUCT_SIZE(sem_wr_check_rd_alive) );
+        if(res == -1){
+            break;
+        }
         //! Читаем данные из файла в буфер
         res = produce_item(tmp_buf.buf, file_fd);
         if(res < 0){ //< Ошибка при чтении файла

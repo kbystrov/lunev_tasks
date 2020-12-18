@@ -62,6 +62,16 @@ struct sembuf sem_v_full[1] = {
     {SEM_FULL, 1, 0},
 };
 
+struct sembuf sem_rd_check_wr_alive[2] = {
+    {SEM_WRITER, -1, IPC_NOWAIT},
+    {SEM_WRITER, 1, 0},
+}; 
+
+struct sembuf sem_wr_check_rd_alive[2] = {
+    {SEM_READER, -1, IPC_NOWAIT},
+    {SEM_READER, 1, 0},
+}; 
+
 int init_shmem(key_t key, char ** shm_addr){
 
     CHECK_ERR_NULL(shm_addr, ERR_SHMEM_SEM_INIT_SHMEM_INPUT);
