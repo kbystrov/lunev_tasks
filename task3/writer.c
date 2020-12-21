@@ -135,8 +135,13 @@ int main(int argc, char ** argv) {
         CHECK_ERR_NORET(res, ERR_SHMEM_V_FULL, "Error while V(full) in writer", 1);
     }
 
+    close(file_fd);
+
     res = shmdt(shm_addr);
     CHECK_ERR(res, ERR_SHMEM_SEM_SHMDT, "Error while detaching shared memory in writer", 1);
+
+    res = shmctl(shm_id, IPC_RMID, NULL);
+    CHECK_ERR(res, ERR_SHMEM_SEM_SEMRM, "Error while deleting shared memory in writer", 1);
 
     return 0;
 }

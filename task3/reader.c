@@ -82,5 +82,8 @@ int main() {
     res = shmdt(shm_addr);
     CHECK_ERR(res, ERR_SHMEM_SEM_SHMDT, "Error while detaching shared memory in reader", 1);
 
+    res = semctl(sem_id, SEM_NUM, IPC_RMID);
+    CHECK_ERR(res, ERR_SHMEM_SEM_SHMRM, "Error while deleting semaphore set in reader", 1);
+
     return 0;
 }
