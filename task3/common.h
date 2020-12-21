@@ -51,8 +51,8 @@ union semun {
 extern struct sembuf sem_wr_start[2];
 extern struct sembuf sem_rd_start[2];
 extern struct sembuf sem_wait_pair[1];
-extern struct sembuf sem_wr_init[3];
-extern struct sembuf sem_rd_init[2];
+extern struct sembuf sem_wr_init[4];
+extern struct sembuf sem_rd_init[3];
 extern struct sembuf sem_wr_wait_rd[3];
 extern struct sembuf sem_rd_wait_wr[3];
 extern struct sembuf sem_wr_finish[1];

@@ -16,15 +16,17 @@ struct sembuf sem_wait_pair[1] = {
     {SEM_PAIR, 0, 0},
 };
 
-struct sembuf sem_wr_init[3] = {
+struct sembuf sem_wr_init[4] = {
     {SEM_WRITER, 1, SEM_UNDO},
     {SEM_FULL, -1, SEM_UNDO},
     {SEM_FINISH, -1, SEM_UNDO},
+    {SEM_MUTEX, -1, SEM_UNDO},
 }; 
 
-struct sembuf sem_rd_init[2] = {
+struct sembuf sem_rd_init[3] = {
     {SEM_READER, 1, SEM_UNDO},
     {SEM_EMPTY, -1, SEM_UNDO},
+    {SEM_MUTEX, -1, SEM_UNDO},
 };  
 
 struct sembuf sem_wr_wait_rd[3] = {
