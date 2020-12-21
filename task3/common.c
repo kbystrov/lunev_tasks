@@ -39,7 +39,7 @@ struct sembuf sem_rd_finish[1] = {
 };
 
 struct sembuf sem_p_empty[1] = {
-    {SEM_EMPTY, -1, SEM_UNDO},
+    {SEM_EMPTY, -1, 0},
 };
 
 struct sembuf sem_v_empty[1] = {
@@ -47,11 +47,11 @@ struct sembuf sem_v_empty[1] = {
 };
 
 struct sembuf sem_p_mutex[1] = {
-    {SEM_MUTEX, -1, SEM_UNDO},
+    {SEM_MUTEX, -1, 0},
 };
 
 struct sembuf sem_v_mutex[1] = {
-    {SEM_MUTEX, 1, SEM_UNDO},
+    {SEM_MUTEX, 1, 0},
 };
 
 struct sembuf sem_p_full[1] = {
