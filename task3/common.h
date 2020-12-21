@@ -25,12 +25,13 @@ extern const char * key_name;
 //!@enum Enumeration of semaphores
 enum Sems{
     //! Error code is unknown
-    SEM_MUTEX = 0,
-    SEM_EMPTY,
+    SEM_EMPTY = 0,
     SEM_FULL,
     SEM_WRITER,
     SEM_READER,
     SEM_FINISH,
+    SEM_PAIR,
+    SEM_MUTEX,
     SEM_NUM
 };
 
@@ -49,10 +50,11 @@ union semun {
 
 extern struct sembuf sem_wr_start[2];
 extern struct sembuf sem_rd_start[2];
-extern struct sembuf sem_wr_end[1];
-extern struct sembuf sem_rd_end[1];
-extern struct sembuf sem_wr_wait_rd[2];
-extern struct sembuf sem_rd_wait_wr[2];
+extern struct sembuf sem_wait_pair[1];
+extern struct sembuf sem_wr_init[3];
+extern struct sembuf sem_rd_init[2];
+extern struct sembuf sem_wr_wait_rd[3];
+extern struct sembuf sem_rd_wait_wr[3];
 extern struct sembuf sem_wr_finish[1];
 extern struct sembuf sem_rd_finish[1];
 extern struct sembuf sem_p_empty[1];
@@ -63,7 +65,7 @@ extern struct sembuf sem_p_full[1];
 extern struct sembuf sem_v_full[1];
 extern struct sembuf sem_p_full[1];
 extern struct sembuf sem_wr_check_rd_alive[2];
-extern struct sembuf sem_rd_check_wr_alive[2];
+extern struct sembuf sem_rd_check_wr_alive[3];
 
 int init_shmem(key_t key, char ** shm_addr);
 
